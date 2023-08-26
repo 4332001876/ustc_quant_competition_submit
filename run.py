@@ -19,8 +19,13 @@ result = pd.DataFrame(y_pred, index = test_df.index, columns=['pred'])
 result.to_csv('./result.csv')
 
 #计算rank_ic
-# rank_ic = rank_ic('./result.csv')
-# print('rank_ic: ', rank_ic)
+parser = argparse.ArgumentParser()
+parser.add_argument('--label_path', type=str,  default='../test_label.csv')
+parser.add_argument('--result_path', type=str,  default='./result.csv')
+args = parser.parse_args()
+
+rank_ic = rank_ic(args.result_path, args.label_path)
+print('rank_ic: ', rank_ic)
 
 
 
