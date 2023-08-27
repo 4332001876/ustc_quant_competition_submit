@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data
 import torch.nn.functional as F
+from torchmetrics.regression import MeanAbsolutePercentageError
 
 class ModelType(Enum):
     LinearRegression=1
@@ -14,20 +15,21 @@ class ModelType(Enum):
     LSTM=3
 
 class Model:
-    def __init__(self):
-        self.model_type=ModelType.LinearNet
+    def __init__(self, model_type):
+        self.model_type=model_type
 
         if self.model_type==ModelType.LinearRegression:
             self.model = linear_model.LinearRegression() # 创建线性回归模型
         elif self.model_type==ModelType.LinearNet:
             self.model=LinearNet()
 
-    def train(self, features, labels, epochs=1):
+    def train(self, training_data, save_model_path, epochs=1):
         if self.model_type==ModelType.LinearRegression:
+            features, labels = training_data
             self.model.fit(features, labels) # 线性回归模型
         elif self.model_type==ModelType.LinearNet:
-            train_loader = torch.utils.data.DataLoader(features, batch_size=64, shuffle=True)
-            self.model.run_training(train_loader, train_loader, './checkpoint/model.pth', epochs=epochs)
+            train_loader = torch.utils.data.DataLoader(training_data, batch_size=64, shuffle=True)
+            self.model.run_training(train_loader, train_loader, save_model_path, epochs=epochs)
 
     def predict(self, features):
         if self.model_type==ModelType.LinearRegression:
@@ -39,13 +41,23 @@ class Model:
         with open(path, 'wb') as f:
             pickle.dump(self.model, f)
 
+    def save_model_as_state_dict(self, path):
+        torch.save(self.model.state_dict(), path)
+    
+    def load_model_as_pickle(self, path):
+        with open(path, 'rb') as f:
+            self.model = pickle.load(f)
+
+    def load_model_as_state_dict(self, path):
+        self.model.load_state_dict(torch.load(path))
+
 
 class LinearNet(nn.Module):
     def __init__(self):
         super(LinearNet, self).__init__()
         self.input_size = 300
-        self.hidden_1_size = 30
-        self.hidden_2_size = 12
+        self.hidden_1_size = 18
+        self.hidden_2_size = 6
         self.output_size = 1
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_1_size)
@@ -62,7 +74,7 @@ class LinearNet(nn.Module):
         return x
     
     def run_training(self, train_loader, val_loader, save_model_path, epochs=1):
-        optimizer = optim.Adam(self.parameters(), lr=0.001)
+        optimizer = optim.Adam(self.parameters(), lr=1e-4)
         loss_fn = nn.MSELoss()
         train(self, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=epochs)
 
@@ -91,7 +103,8 @@ class LSTM(nn.Module):
         loss_fn = nn.MSELoss()
         train(self, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=epochs)
     
-def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=1):
+def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=1, need_correct_rate = False):
+    
     if torch.cuda.is_available():
         device = torch.device("cuda") 
     else:
@@ -108,6 +121,9 @@ def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, 
             #inputs = inputs.to(device)
             #targets = targets.to(device)
             output = model(inputs)
+            if output.shape != targets.shape:
+                output = output.reshape(-1)
+                targets = targets.reshape(-1)
             loss = loss_fn(output, targets)
             loss.backward()
             optimizer.step()
@@ -122,12 +138,15 @@ def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, 
             #inputs = inputs.to(device)
             output = model(inputs)
             #targets = targets.to(device)
+            if output.shape != targets.shape:
+                output = output.reshape(-1)
+                targets = targets.reshape(-1)
             loss = loss_fn(output,targets) 
             valid_loss += loss.data.item() * inputs.size(0) # inputs.size(0)是batch_size
-            if targets[0].size()!=torch.Size([]): # 结果是个size不为1的向量
-                correct=torch.tensor([0])
-            else:
+            if need_correct_rate: # 结果是个size不为1的向量
                 correct = torch.eq(torch.max(F.softmax(output, dim=1), dim=1)[1], targets)
+            else:
+                correct = torch.tensor([0])
             num_correct += torch.sum(correct).item()
             num_examples += correct.shape[0]
         valid_loss /= len(val_loader.dataset)

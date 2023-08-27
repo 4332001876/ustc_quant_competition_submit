@@ -1,6 +1,11 @@
 import pandas as pd
+from model import ModelType
+
+import torch.utils.data
+
 class DataManager:
-    def __init__(self):
+    def __init__(self, model_type):
+        self.model_type = model_type
         # 读取数据, 选择 'time_id', 'stock_id' 作为索引
         self.train_df = pd.read_csv('../train.csv').set_index(['time_id', 'stock_id'])
         # 填充缺失数据
@@ -11,3 +16,20 @@ class DataManager:
         X = self.train_df.iloc[:,:-1].values
         y = self.train_df.iloc[:,-1].values
         return X,y
+    def get_training_data(self):
+        X,y = self.get_np_values()
+        if self.model_type==ModelType.LinearRegression:
+            return (X,y)
+        elif self.model_type==ModelType.LinearNet:
+            return Dataset(X,y)
+        
+class Dataset(torch.utils.data.Dataset):
+    def __init__(self, features, labels):
+        self.features = features
+        self.labels = labels
+        
+    def __getitem__(self, index):    
+        return torch.tensor(self.features[index],dtype=torch.float32), torch.tensor(self.labels[index],dtype=torch.float32)
+    
+    def __len__(self):
+        return len(self.features)

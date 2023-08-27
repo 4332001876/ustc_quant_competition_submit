@@ -32,6 +32,7 @@ python rank_ic.py
 
 ## 测试结果
 baseline-线性回归：0.0926
+naive linear net: 0.0301
 
 
 
