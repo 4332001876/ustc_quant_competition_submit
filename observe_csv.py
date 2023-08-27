@@ -51,4 +51,7 @@ print('col_std:\n',col_std.to_list())
 test_df=test_df.set_index(['time_id','stock_id'])
 #test_df=test_df[test_df['stock_id']==1]
 #test_df=test_df.set_index('stock_id').loc[1]#success
-print(test_df.loc[(1,2)])
+#print(test_df.loc[(1,2)])
+
+'''for data in test_df:
+    print(data)'''

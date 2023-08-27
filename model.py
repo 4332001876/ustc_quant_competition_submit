@@ -1,5 +1,6 @@
 from sklearn import linear_model
 import pickle
+from enum import Enum
 
 import torch
 import torch.nn as nn
@@ -7,15 +8,32 @@ import torch.optim as optim
 import torch.utils.data
 import torch.nn.functional as F
 
+class ModelType(Enum):
+    LinearRegression=1
+    LinearNet=2
+    LSTM=3
+
 class Model:
     def __init__(self):
-        self.model = linear_model.LinearRegression() # 创建线性回归模型
+        self.model_type=ModelType.LinearNet
 
-    def train(self, features, labels, epochs=5):
-        self.model.fit(features, labels) # 训练模型
+        if self.model_type==ModelType.LinearRegression:
+            self.model = linear_model.LinearRegression() # 创建线性回归模型
+        elif self.model_type==ModelType.LinearNet:
+            self.model=LinearNet()
+
+    def train(self, features, labels, epochs=1):
+        if self.model_type==ModelType.LinearRegression:
+            self.model.fit(features, labels) # 线性回归模型
+        elif self.model_type==ModelType.LinearNet:
+            train_loader = torch.utils.data.DataLoader(features, batch_size=64, shuffle=True)
+            self.model.run_training(train_loader, train_loader, './checkpoint/model.pth', epochs=epochs)
 
     def predict(self, features):
-        return self.model.predict(features)
+        if self.model_type==ModelType.LinearRegression:
+            return self.model.predict(features) # 线性回归模型
+        elif self.model_type==ModelType.LinearNet:
+            return self.model(features).detach().numpy()
     
     def save_model_as_pickle(self, path):
         with open(path, 'wb') as f:
@@ -42,6 +60,7 @@ class LinearNet(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+    
     def run_training(self, train_loader, val_loader, save_model_path, epochs=1):
         optimizer = optim.Adam(self.parameters(), lr=0.001)
         loss_fn = nn.MSELoss()

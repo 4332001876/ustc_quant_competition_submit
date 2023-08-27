@@ -3,8 +3,8 @@ import pandas as pd
 from model import *
 from data_manager import DataManager
 
-PICKLE_PATH = 'reg.pkl'
-SAVE_STATE_DICT_PATH = 'params.txt'
+PICKLE_PATH = './checkpoint/reg.pkl'
+SAVE_STATE_DICT_PATH = './checkpoint/model.pth'
 
 # 获取数据
 data_manager = DataManager()
