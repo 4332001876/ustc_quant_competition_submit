@@ -32,7 +32,7 @@ class DataManager:
         for group in groups:
             X = torch.tensor(group[1].iloc[:,:-1].values, dtype=torch.float32)
             y = torch.tensor(group[1].iloc[:,-1].values, dtype=torch.float32)
-            stock_id_grouped_data.append((X, y))
+            stock_id_grouped_data.append(((group[0],X), y))
         return stock_id_grouped_data
 
     def get_training_data(self):
@@ -42,6 +42,8 @@ class DataManager:
         elif self.model_type==ModelType.LinearNet:
             #return torch.utils.data.DataLoader(Dataset(X,y), batch_size=64, shuffle=True)
             return self.get_time_id_grouped_data()
+        elif self.model_type==ModelType.LSTM:
+            return self.get_stock_id_grouped_data()
         
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, features, labels):

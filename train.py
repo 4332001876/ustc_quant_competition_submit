@@ -3,7 +3,7 @@ import pandas as pd
 from model import *
 from data_manager import DataManager
 
-MODEL_TYPE = ModelType.LinearNet
+MODEL_TYPE = ModelType.LSTM
 
 REG_PATH = './checkpoint/reg.pkl'
 SAVE_STATE_DICT_PATH = './checkpoint/model.pth'
