@@ -9,6 +9,8 @@ import torch.utils.data
 import torch.nn.functional as F
 from torchmetrics.regression import MeanAbsolutePercentageError
 
+REG_BASELINE_PATH = './checkpoint/reg baseline.pkl'
+
 class ModelType(Enum):
     LinearRegression=1
     LinearNet=2
@@ -21,15 +23,14 @@ class Model:
         if self.model_type==ModelType.LinearRegression:
             self.model = linear_model.LinearRegression() # 创建线性回归模型
         elif self.model_type==ModelType.LinearNet:
-            self.model=LinearNet()
+            self.model = LinearNet()
 
     def train(self, training_data, save_model_path, epochs=1):
         if self.model_type==ModelType.LinearRegression:
             features, labels = training_data
             self.model.fit(features, labels) # 线性回归模型
         elif self.model_type==ModelType.LinearNet:
-            train_loader = torch.utils.data.DataLoader(training_data, batch_size=64, shuffle=True)
-            self.model.run_training(train_loader, train_loader, save_model_path, epochs=epochs)
+            self.model.run_training(training_data, training_data, save_model_path, epochs=epochs)
 
     def predict(self, features):
         if self.model_type==ModelType.LinearRegression:
@@ -51,7 +52,6 @@ class Model:
     def load_model_as_state_dict(self, path):
         self.model.load_state_dict(torch.load(path))
 
-
 class LinearNet(nn.Module):
     def __init__(self):
         super(LinearNet, self).__init__()
@@ -64,42 +64,48 @@ class LinearNet(nn.Module):
         self.norm=torch.nn.BatchNorm1d(self.hidden_1_size, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
         self.fc2 = nn.Linear(self.hidden_1_size, self.hidden_2_size)
         self.fc3 = nn.Linear(self.hidden_2_size, self.output_size)
+
+        self.reg = Model(ModelType.LinearRegression)
+        self.reg.load_model_as_pickle(REG_BASELINE_PATH)
     
     def forward(self, x):
         x = x.view(-1, self.input_size)
+        reg_result = self.reg.predict(x.detach().numpy())
         x = F.relu(self.fc1(x))
         x = self.norm(x)
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
+        x = x + torch.tensor(reg_result, dtype=torch.float32).reshape(-1, 1)
+        average = torch.mean(x)
+        x = x - average
         return x
     
-    def run_training(self, train_loader, val_loader, save_model_path, epochs=1):
+    def run_training(self, train_loader, val_loader, save_model_path, epochs=5):
         optimizer = optim.Adam(self.parameters(), lr=1e-4)
         loss_fn = nn.MSELoss()
         train(self, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=epochs)
 
 class LSTM(nn.Module):
-    def __init__(self):
-        super(LinearNet, self).__init__()
-        self.input_size = 300
-        self.hidden_1_size = 30
-        self.hidden_2_size = 12
-        self.output_size = 1
+    def __init__(self, input_size=300, hidden_layer_size=20, output_size=1):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_layer_size = hidden_layer_size
+        self.output_size = output_size
+        self.lstm = nn.LSTM(input_size, hidden_layer_size)
+        self.hidden_cell_pool={}
+        
+    def forward(self, input_seq, stock_id):
+        if stock_id not in self.hidden_cell_pool:
+            self.hidden_cell_pool[stock_id] = (torch.randn(1,1,self.output_size), torch.randn(1,1,self.hidden_layer_size))
+        else:
+            self.hidden_cell = self.hidden_cell_pool[stock_id]
 
-        self.fc1 = nn.Linear(self.input_size, self.hidden_1_size)
-        self.norm=torch.nn.BatchNorm1d(self.hidden_1_size, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        self.fc2 = nn.Linear(self.hidden_1_size, self.hidden_2_size)
-        self.fc3 = nn.Linear(self.hidden_2_size, self.output_size)
+        lstm_out, self.hidden_cell = self.lstm(input_seq.view(len(input_seq) ,1, -1), self.hidden_cell)
+        predictions = self.linear(lstm_out.view(len(input_seq), -1))
+        return predictions[-1]
     
-    def forward(self, x):
-        x = x.view(-1, self.input_size)
-        x = F.relu(self.fc1(x))
-        x = self.norm(x)
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
     def run_training(self, train_loader, val_loader, save_model_path, epochs=1):
-        optimizer = optim.Adam(self.parameters(), lr=0.001)
+        optimizer = optim.Adam(self.parameters(), lr=0.0001)
         loss_fn = nn.MSELoss()
         train(self, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=epochs)
     
@@ -128,7 +134,7 @@ def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, 
             loss.backward()
             optimizer.step()
             training_loss += loss.data.item() * inputs.size(0) # inputs.size(0)是batch_size
-        training_loss /= len(train_loader.dataset)
+        training_loss /= len(train_loader)
         
         model.eval()
         num_correct = 0 
@@ -149,7 +155,7 @@ def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, 
                 correct = torch.tensor([0])
             num_correct += torch.sum(correct).item()
             num_examples += correct.shape[0]
-        valid_loss /= len(val_loader.dataset)
+        valid_loss /= len(val_loader)
 
         print('Epoch: {}, Training Loss: {:.4f}, Validation Loss: {:.4f}, accuracy = {:.4f}'.format(epoch, training_loss,
         valid_loss, num_correct / num_examples))

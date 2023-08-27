@@ -1,6 +1,7 @@
 import pandas as pd
 from model import ModelType
 
+import torch
 import torch.utils.data
 
 class DataManager:
@@ -16,12 +17,31 @@ class DataManager:
         X = self.train_df.iloc[:,:-1].values
         y = self.train_df.iloc[:,-1].values
         return X,y
+    def get_time_id_grouped_data(self):
+        groups = self.train_df.groupby('time_id')
+        time_id_grouped_data=[]
+        for group in groups:
+            X = torch.tensor(group[1].iloc[:,:-1].values, dtype=torch.float32)
+            y = torch.tensor(group[1].iloc[:,-1].values, dtype=torch.float32)
+            time_id_grouped_data.append((X, y))
+        return time_id_grouped_data
+    
+    def get_stock_id_grouped_data(self):
+        groups = self.train_df.groupby('stock_id')
+        stock_id_grouped_data=[]
+        for group in groups:
+            X = torch.tensor(group[1].iloc[:,:-1].values, dtype=torch.float32)
+            y = torch.tensor(group[1].iloc[:,-1].values, dtype=torch.float32)
+            stock_id_grouped_data.append((X, y))
+        return stock_id_grouped_data
+
     def get_training_data(self):
         X,y = self.get_np_values()
         if self.model_type==ModelType.LinearRegression:
             return (X,y)
         elif self.model_type==ModelType.LinearNet:
-            return Dataset(X,y)
+            #return torch.utils.data.DataLoader(Dataset(X,y), batch_size=64, shuffle=True)
+            return self.get_time_id_grouped_data()
         
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, features, labels):
