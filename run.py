@@ -2,13 +2,14 @@ import pandas as pd
 import pickle
 from rank_ic import *
 import numpy as np
+from tqdm import tqdm
 
 from model import *
 
-MODEL_TYPE = ModelType.LinearNet
+MODEL_TYPE = ModelType.LSTM
 
 PICKLE_PATH = './checkpoint/reg.pkl'
-SAVE_STATE_DICT_PATH = './checkpoint/pairwise linear/model13.pth'
+SAVE_STATE_DICT_PATH = './checkpoint/model.pth'
 # './checkpoint/pairwise linear/model10.pth'
 
 #加载测试数据
@@ -26,7 +27,7 @@ model.load_model_as_state_dict(SAVE_STATE_DICT_PATH)
 #生成预测
 if MODEL_TYPE==ModelType.LSTM:
     IS_GOURPBY_STOCK_ID = 1
-    if IS_GOURPBY_STOCK_ID:
+    if not IS_GOURPBY_STOCK_ID:
         result = None
         for index,data in test_df.iterrows():
             X = torch.tensor(data.values, dtype=torch.float32).reshape(-1,300)
@@ -38,22 +39,24 @@ if MODEL_TYPE==ModelType.LSTM:
                 result = np.hstack((result, y_pred))
         result = pd.DataFrame(result, index = test_df.index, columns=['pred'])
     else:
+        pbar = tqdm(total = 2500, desc='Running:')
         groups = test_df.groupby('stock_id')
         result = None
         for group in groups:
             group_result = None
             for i in range(0,len(group[1])):
                 X = torch.tensor(group[1].iloc[0:i+1,:].values, dtype=torch.float32)
-                y_pred = model.predict(X,dtype=torch.float32)
+                y_pred = model.predict((group[0],X))
                 if group_result is None:
                     group_result = y_pred
                 else:
                     group_result = np.hstack((group_result, y_pred))
-            temp_stock_df = pd.DataFrame(group_result, index = group[1].index, columns=['pred'])
+            temp_stock_df = pd.DataFrame(group_result.reshape(-1,1), index = group[1].index, columns=['pred'])
             if result is None:
                 result = temp_stock_df
             else:
                 result = pd.concat([result, temp_stock_df], axis=0)
+            pbar.update(1)
 else:
     y_pred = model.predict(torch.tensor(X_test,dtype=torch.float32))
     result = pd.DataFrame(y_pred, index = test_df.index, columns=['pred'])

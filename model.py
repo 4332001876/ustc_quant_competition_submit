@@ -120,8 +120,9 @@ class LSTM(nn.Module):
         self.linear = nn.Linear(hidden_layer_size, output_size)
         self.hidden_cell_pool={}
 
-        self.reg = Model(ModelType.LinearRegression)
-        self.reg.load_model_as_pickle(REG_BASELINE_PATH)
+        self.linear_net = Model(ModelType.LinearNet)
+        self.linear_net.load_model_as_state_dict('./checkpoint/pairwise linear/model15.pth')
+        self.linear_net.model.eval()
         
     def forward(self, inputs):
         stock_id, input_seq = inputs
@@ -134,18 +135,19 @@ class LSTM(nn.Module):
         lstm_out, self.hidden_cell = self.lstm(input_seq.view(len(input_seq) ,1, -1), self.hidden_cell)
         predictions = self.linear(lstm_out.view(len(input_seq), -1))
         result = predictions[-1].reshape(-1, 1)
-        reg_result = self.reg.predict(input_seq[-1].detach().numpy().reshape(-1,self.input_size))
-        result += torch.tensor(reg_result, dtype=torch.float32).reshape(-1, 1)
+        linear_result = self.linear_net.predict(input_seq[-1].reshape(-1,self.input_size))
+        linear_weight = torch.tensor(1, dtype=torch.float32, requires_grad=True)
+        result += linear_weight * torch.tensor(linear_result, dtype=torch.float32).reshape(-1, 1)
 
         return result
     
     def run_training(self, train_loader, val_loader, save_model_path, epochs=1):
         optimizer = optim.Adam(self.parameters(), lr=0.0001)
-        loss_fn = PairWiseLoss# nn.MSELoss()
+        loss_fn = nn.MSELoss()
         train(self, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=epochs)
     
 def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=1, need_correct_rate = False):
-    IS_LSTM=0
+    IS_LSTM=1
     if torch.cuda.is_available():
         device = torch.device("cuda") 
     else:
