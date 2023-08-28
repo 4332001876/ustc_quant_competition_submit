@@ -1,6 +1,8 @@
 from sklearn import linear_model
 import pickle
 from enum import Enum
+import random
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -15,6 +17,20 @@ class ModelType(Enum):
     LinearRegression=1
     LinearNet=2
     LSTM=3
+
+def PairWiseLoss(outputs, targets, margin=0.1):
+    loss = torch.tensor(0, dtype=torch.float32)
+    loss.requires_grad_(True)
+    idx = [i for i in range(len(outputs))]
+    random.shuffle(idx)
+    for n in range(len(outputs)//2):
+        i = idx[2*n]
+        j = idx[2*n+1]
+        if targets[i] > targets[j]:
+            loss += torch.max(torch.tensor([0.0,margin-outputs[i]+outputs[j]], dtype=torch.float32))
+        else:
+            loss += torch.max(torch.tensor([0.0,margin-outputs[j]+outputs[i]], dtype=torch.float32))
+    return loss
 
 class Model:
     def __init__(self, model_type):
@@ -88,11 +104,11 @@ class LinearNet(nn.Module):
     
     def run_training(self, train_loader, val_loader, save_model_path, epochs=5):
         optimizer = optim.Adam(self.parameters(), lr=1e-4)
-        loss_fn = nn.MSELoss()
+        loss_fn = PairWiseLoss # nn.MSELoss()
         train(self, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=epochs)
 
 class LSTM(nn.Module):
-    def __init__(self, input_size=300, hidden_layer_size=20, output_size=1):
+    def __init__(self, input_size=300, hidden_layer_size=60, output_size=1):
         super().__init__()
         self.input_size = input_size
         self.hidden_layer_size = hidden_layer_size
@@ -114,19 +130,19 @@ class LSTM(nn.Module):
 
         lstm_out, self.hidden_cell = self.lstm(input_seq.view(len(input_seq) ,1, -1), self.hidden_cell)
         predictions = self.linear(lstm_out.view(len(input_seq), -1))
-        result = predictions.reshape(-1, 1)
-        reg_result = self.reg.predict(input_seq.detach().numpy().reshape(-1,self.input_size))
+        result = predictions[-1].reshape(-1, 1)
+        reg_result = self.reg.predict(input_seq[-1].detach().numpy().reshape(-1,self.input_size))
         result += torch.tensor(reg_result, dtype=torch.float32).reshape(-1, 1)
 
         return result
     
     def run_training(self, train_loader, val_loader, save_model_path, epochs=1):
         optimizer = optim.Adam(self.parameters(), lr=0.0001)
-        loss_fn = nn.MSELoss()
+        loss_fn = PairWiseLoss# nn.MSELoss()
         train(self, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=epochs)
     
 def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, epochs=1, need_correct_rate = False):
-    IS_LSTM=1
+    IS_LSTM=0
     if torch.cuda.is_available():
         device = torch.device("cuda") 
     else:
@@ -137,42 +153,76 @@ def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, 
         valid_loss = 0.0
 
         model.train()
+        batch_num = 0
+        pbar = tqdm(total = len(train_loader), desc='Training Epoch %d'%epoch)
         for batch in train_loader:
             optimizer.zero_grad()
-            inputs, targets = batch
-            #inputs = inputs.to(device)
-            #targets = targets.to(device)
-            output = model(inputs)
-            if output.shape != targets.shape:
-                output = output.reshape(-1)
+            
+
+            if IS_LSTM:
+                outputs = None
+                for index, data in batch[1].iterrows():
+                    X = torch.tensor(data[:-1].values, dtype=torch.float32).reshape(-1,300)
+                    input = (index[1],X)
+                    output = model(input)
+                    if outputs is None:
+                        outputs = output
+                    else:
+                        outputs = torch.cat((outputs, output), 0)
+                targets = torch.tensor(batch[1].iloc[:,-1].values, dtype=torch.float32).reshape(-1,1)
+                outputs = outputs - torch.mean(outputs)
+            else:
+                inputs, targets = batch    
+                #inputs = inputs.to(device)
+                #targets = targets.to(device)
+                outputs = model(inputs)
+
+            if outputs.shape != targets.shape:
+                outputs = outputs.reshape(-1)
                 targets = targets.reshape(-1)
-            loss = loss_fn(output, targets)
+            loss = loss_fn(outputs, targets)
             loss.backward()
             optimizer.step()
             training_loss += loss.data.item() # inputs.size(0)是batch_size
-        training_loss /= len(train_loader)
+            batch_num += 1
+            pbar.update(1)
+        training_loss /= batch_num
         
-        model.eval()
+        '''model.eval()
         num_correct = 0 
         num_examples = 0
+        batch_num = 0
+        pbar = tqdm(total = len(train_loader), desc='Validating Epoch %d'%epoch)
         for batch in val_loader:
             inputs, targets = batch
             #inputs = inputs.to(device)
-            output = model(inputs)
+            if IS_LSTM:
+                rand_index = random.randint(0,targets.size(0)-1)
+                inputs = (inputs[0], inputs[1][rand_index].reshape(1,-1))
+                targets = targets[rand_index]
+
+            outputs = model(inputs)
             #targets = targets.to(device)
-            if output.shape != targets.shape:
-                output = output.reshape(-1)
+            if outputs.shape != targets.shape:
+                outputs = outputs.reshape(-1)
                 targets = targets.reshape(-1)
-            loss = loss_fn(output,targets) 
+            loss = loss_fn(outputs,targets) 
             valid_loss += loss.data.item() # inputs.size(0)是batch_size
             if need_correct_rate: # 结果是个size不为1的向量
-                correct = torch.eq(torch.max(F.softmax(output, dim=1), dim=1)[1], targets)
+                correct = torch.eq(torch.max(F.softmax(outputs, dim=1), dim=1)[1], targets)
             else:
                 correct = torch.tensor([0])
             num_correct += torch.sum(correct).item()
             num_examples += correct.shape[0]
-        valid_loss /= len(val_loader)
+            batch_num += 1
+            pbar.update(1)
+        valid_loss /= batch_num
 
         print('Epoch: {}, Training Loss: {:.4f}, Validation Loss: {:.4f}, accuracy = {:.4f}'.format(epoch, training_loss,
-        valid_loss, num_correct / num_examples))
+        valid_loss, num_correct / num_examples))'''
+        print('Epoch: {}, Training Loss: {:.4f}'.format(epoch, training_loss))
         torch.save(model.state_dict(),save_model_path)
+        if epoch%1==0:
+            torch.save(model.state_dict(),'./checkpoint/model%d.pth'%epoch)
+
+

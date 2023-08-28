@@ -26,6 +26,13 @@ class DataManager:
             time_id_grouped_data.append((X, y))
         return time_id_grouped_data
     
+    def get_time_id_grouped_df(self):
+        groups = self.train_df.groupby('time_id')
+        time_id_grouped_df=[]
+        for group in groups:
+            time_id_grouped_df.append(group)
+        return time_id_grouped_df
+    
     def get_stock_id_grouped_data(self):
         groups = self.train_df.groupby('stock_id')
         stock_id_grouped_data=[]
@@ -43,7 +50,7 @@ class DataManager:
             #return torch.utils.data.DataLoader(Dataset(X,y), batch_size=64, shuffle=True)
             return self.get_time_id_grouped_data()
         elif self.model_type==ModelType.LSTM:
-            return self.get_stock_id_grouped_data()
+            return self.get_time_id_grouped_df()
         
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, features, labels):
@@ -55,3 +62,4 @@ class Dataset(torch.utils.data.Dataset):
     
     def __len__(self):
         return len(self.features)
+    

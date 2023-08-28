@@ -1,6 +1,7 @@
 import pandas as pd
 import pickle
 from rank_ic import *
+import numpy as np
 
 from model import *
 
@@ -22,11 +23,24 @@ model = Model(MODEL_TYPE)
 model.load_model_as_state_dict(SAVE_STATE_DICT_PATH)
 
 #生成预测
-y_pred = model.predict(torch.tensor(X_test,dtype=torch.float32))
+'''result = None
+for index,data in test_df.iterrows():
+    X = torch.tensor(data.values, dtype=torch.float32).reshape(-1,300)
+    y_pred = model.predict((index[1],X)).reshape(-1)
+    #temp_stock_df = pd.DataFrame(y_pred, index = group[1].index, columns=['pred'])
+    if result is None:
+        result = y_pred
+    else:
+        result = np.hstack((result, y_pred))
+result = pd.DataFrame(result, index = test_df.index, columns=['pred'])'''
 
-#保存结果
+y_pred = model.predict(torch.tensor(X_test,dtype=torch.float32))
 result = pd.DataFrame(y_pred, index = test_df.index, columns=['pred'])
+#保存结果
+
+result = result.sort_index()
 result.to_csv('./result.csv')
+
 
 #计算rank_ic
 parser = argparse.ArgumentParser()
