@@ -8,7 +8,8 @@ from model import *
 MODEL_TYPE = ModelType.LinearNet
 
 PICKLE_PATH = './checkpoint/reg.pkl'
-SAVE_STATE_DICT_PATH = './checkpoint/model.pth'
+SAVE_STATE_DICT_PATH = './checkpoint/pairwise linear/model13.pth'
+# './checkpoint/pairwise linear/model10.pth'
 
 #加载测试数据
 test_df = pd.read_csv('../test.csv').set_index(['time_id', 'stock_id'])
@@ -23,21 +24,41 @@ model = Model(MODEL_TYPE)
 model.load_model_as_state_dict(SAVE_STATE_DICT_PATH)
 
 #生成预测
-'''result = None
-for index,data in test_df.iterrows():
-    X = torch.tensor(data.values, dtype=torch.float32).reshape(-1,300)
-    y_pred = model.predict((index[1],X)).reshape(-1)
-    #temp_stock_df = pd.DataFrame(y_pred, index = group[1].index, columns=['pred'])
-    if result is None:
-        result = y_pred
+if MODEL_TYPE==ModelType.LSTM:
+    IS_GOURPBY_STOCK_ID = 1
+    if IS_GOURPBY_STOCK_ID:
+        result = None
+        for index,data in test_df.iterrows():
+            X = torch.tensor(data.values, dtype=torch.float32).reshape(-1,300)
+            y_pred = model.predict((index[1],X)).reshape(-1)
+            #temp_stock_df = pd.DataFrame(y_pred, index = group[1].index, columns=['pred'])
+            if result is None:
+                result = y_pred
+            else:
+                result = np.hstack((result, y_pred))
+        result = pd.DataFrame(result, index = test_df.index, columns=['pred'])
     else:
-        result = np.hstack((result, y_pred))
-result = pd.DataFrame(result, index = test_df.index, columns=['pred'])'''
+        groups = test_df.groupby('stock_id')
+        result = None
+        for group in groups:
+            group_result = None
+            for i in range(0,len(group[1])):
+                X = torch.tensor(group[1].iloc[0:i+1,:].values, dtype=torch.float32)
+                y_pred = model.predict(X,dtype=torch.float32)
+                if group_result is None:
+                    group_result = y_pred
+                else:
+                    group_result = np.hstack((group_result, y_pred))
+            temp_stock_df = pd.DataFrame(group_result, index = group[1].index, columns=['pred'])
+            if result is None:
+                result = temp_stock_df
+            else:
+                result = pd.concat([result, temp_stock_df], axis=0)
+else:
+    y_pred = model.predict(torch.tensor(X_test,dtype=torch.float32))
+    result = pd.DataFrame(y_pred, index = test_df.index, columns=['pred'])
 
-y_pred = model.predict(torch.tensor(X_test,dtype=torch.float32))
-result = pd.DataFrame(y_pred, index = test_df.index, columns=['pred'])
 #保存结果
-
 result = result.sort_index()
 result.to_csv('./result.csv')
 

@@ -35,6 +35,7 @@ baseline-线性回归：0.0926
 naive linear net: 0.0301
 去平均linear net: 0.0876
 线性回归+linear net（学习残差）: 0.0903
+PairWiseLoss: 0.0983
 
 
 

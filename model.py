@@ -27,9 +27,12 @@ def PairWiseLoss(outputs, targets, margin=0.1):
         i = idx[2*n]
         j = idx[2*n+1]
         if targets[i] > targets[j]:
-            loss += torch.max(torch.tensor([0.0,margin-outputs[i]+outputs[j]], dtype=torch.float32))
+            if margin-outputs[i]+outputs[j]>0:
+                loss = loss + margin-outputs[i]+outputs[j]
         else:
-            loss += torch.max(torch.tensor([0.0,margin-outputs[j]+outputs[i]], dtype=torch.float32))
+            if margin-outputs[j]+outputs[i]>0:
+                loss = loss + margin-outputs[j]+outputs[i]
+        loss = loss
     return loss
 
 class Model:
@@ -160,7 +163,12 @@ def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, 
             
 
             if IS_LSTM:
-                outputs = None
+                inputs, targets = batch 
+                rand_index = random.randint(0,targets.size(0)-1)
+                inputs = (inputs[0], inputs[1][0:rand_index+1].reshape(-1,300))
+                targets = targets[rand_index]
+                outputs = model(inputs)
+                '''outputs = None
                 for index, data in batch[1].iterrows():
                     X = torch.tensor(data[:-1].values, dtype=torch.float32).reshape(-1,300)
                     input = (index[1],X)
@@ -170,7 +178,7 @@ def train(model, optimizer, loss_fn, train_loader, val_loader, save_model_path, 
                     else:
                         outputs = torch.cat((outputs, output), 0)
                 targets = torch.tensor(batch[1].iloc[:,-1].values, dtype=torch.float32).reshape(-1,1)
-                outputs = outputs - torch.mean(outputs)
+                outputs = outputs - torch.mean(outputs)'''
             else:
                 inputs, targets = batch    
                 #inputs = inputs.to(device)

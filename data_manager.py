@@ -50,7 +50,7 @@ class DataManager:
             #return torch.utils.data.DataLoader(Dataset(X,y), batch_size=64, shuffle=True)
             return self.get_time_id_grouped_data()
         elif self.model_type==ModelType.LSTM:
-            return self.get_time_id_grouped_df()
+            return self.get_stock_id_grouped_data()
         
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, features, labels):
