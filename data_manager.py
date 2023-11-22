@@ -1,14 +1,16 @@
 import pandas as pd
 from model import ModelType
+from config import Config
 
 import torch
 import torch.utils.data
+
 
 class DataManager:
     def __init__(self, model_type):
         self.model_type = model_type
         # 读取数据, 选择 'time_id', 'stock_id' 作为索引
-        self.train_df = pd.read_csv('../train.csv').set_index(['time_id', 'stock_id'])
+        self.train_df = pd.read_csv(Config.DATASET_PATH).set_index(['time_id', 'stock_id'])
         # 填充缺失数据
         self.train_df.fillna(0, inplace=True)
         print(self.train_df)
@@ -52,7 +54,7 @@ class DataManager:
         elif self.model_type==ModelType.LSTM:
             return self.get_stock_id_grouped_data()
         
-class Dataset(torch.utils.data.Dataset):
+class QuantDataset(torch.utils.data.Dataset):
     def __init__(self, features, labels):
         self.features = features
         self.labels = labels
