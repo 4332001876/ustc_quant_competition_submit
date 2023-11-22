@@ -16,7 +16,7 @@ class Config:
     SAVE_RESULT_PATH = './result.csv'
 
     # 训练参数
-    EPOCHS = 12
+    EPOCHS = 50
     BATCH_SIZE = 64
     LEARNING_RATE = 0.002
     MOMENTUM = 0.9

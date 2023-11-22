@@ -68,6 +68,53 @@ class LinearNet(nn.Module):
         x = torch.mean(x, dim=1)
         return x
 
+class TreeLinearBlock(nn.Module):
+    def __init__(self, input_size, choice_size, output_size):
+        super().__init__()
+        self.input_size = input_size
+        self.choice_size = choice_size
+        self.output_size = output_size
+        self.fc = nn.Linear(input_size, output_size * choice_size)
+        self.fc_choice = nn.Linear(input_size, choice_size)
+        self.norm=torch.nn.BatchNorm1d(output_size, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        
+
+    def forward(self, x):
+        choice = torch.softmax(self.fc_choice(x),dim=1).reshape(-1, self.choice_size, 1)
+        x = F.relu(self.fc(x))
+
+        x = x.reshape(-1, self.output_size, self.choice_size) 
+        x = torch.matmul(x, choice).squeeze(dim=2)
+        x = self.norm(x)
+        return x
+
+
+class TreeLinearNet(nn.Module):
+    def __init__(self):
+        super(TreeLinearNet, self).__init__()
+        self.input_size = 300
+
+        self.hidden_1_choice_size = 10
+        self.hidden_1_size = 100
+
+        self.hidden_2_choice_size = 20
+        self.hidden_2_size = 30
+
+        self.output_size = 10
+
+        self.tree_linear1 = TreeLinearBlock(self.input_size, self.hidden_1_choice_size, self.hidden_1_size)
+        self.tree_linear2 = TreeLinearBlock(self.hidden_1_size, self.hidden_2_choice_size, self.hidden_2_size)
+        self.fc3 = nn.Linear(self.hidden_2_size, self.output_size)
+    
+    def forward(self, x):
+        x = x.view(-1, self.input_size)
+        x = self.tree_linear1(x)
+        x = self.tree_linear2(x)
+        x = self.fc3(x)
+        x = torch.mean(x, dim=1)
+        return x
+    
+
 class LSTM(nn.Module):
     def __init__(self, input_size=300, hidden_layer_size=60, output_size=1):
         super().__init__()

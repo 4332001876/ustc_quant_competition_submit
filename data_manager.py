@@ -13,7 +13,12 @@ class DataManager:
         self.train_df = pd.read_csv(Config.DATASET_PATH).set_index(['time_id', 'stock_id'])
         # 填充缺失数据
         self.train_df.fillna(0, inplace=True)
+
+        self.test_df = pd.read_csv(Config.TEST_DATASET_PATH).set_index(['time_id', 'stock_id'])
+        self.test_df.fillna(0, inplace=True)
+        
         print(self.train_df)
+
     def get_np_values(self):
         # 将数据集划分为特征和目标变量
         X = self.train_df.iloc[:,:-1].values
@@ -53,6 +58,9 @@ class DataManager:
             return self.get_time_id_grouped_data()
         elif self.model_type==ModelType.LSTM:
             return self.get_stock_id_grouped_data()
+    
+    def get_testing_data(self):
+        return self.test_df.values
         
 class QuantDataset(torch.utils.data.Dataset):
     def __init__(self, features, labels):
