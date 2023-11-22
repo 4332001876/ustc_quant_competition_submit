@@ -50,9 +50,9 @@ class LinearNet(nn.Module):
     def __init__(self):
         super(LinearNet, self).__init__()
         self.input_size = 300
-        self.hidden_1_size = 18
-        self.hidden_2_size = 6
-        self.output_size = 1
+        self.hidden_1_size = 180
+        self.hidden_2_size = 60
+        self.output_size = 10
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_1_size)
         self.norm=torch.nn.BatchNorm1d(self.hidden_1_size, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
@@ -65,6 +65,7 @@ class LinearNet(nn.Module):
         x = self.norm(x)
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
+        x = torch.mean(x, dim=1)
         return x
 
 class LSTM(nn.Module):

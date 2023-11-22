@@ -1,5 +1,6 @@
 import pandas as pd
 import argparse
+from config import Config
 
 def rank_ic(result_path, label_path):
 
@@ -13,8 +14,8 @@ def rank_ic(result_path, label_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--label_path', type=str,  default='../test_label.csv')
-    parser.add_argument('--result_path', type=str,  default='./result.csv')
+    parser.add_argument('--label_path', type=str,  default=Config.TEST_DATASET_LABEL_PATH)
+    parser.add_argument('--result_path', type=str,  default=Config.SAVE_RESULT_PATH)
     args = parser.parse_args()
 
     rank_ic = rank_ic(args.result_path, args.label_path)

@@ -15,7 +15,7 @@ class Trainer:
         if Config.PRETRAINED:
             self.load_model(Config.PRETRAINED_MODEL_PATH)
 
-        self.loss_fn = nn.CrossEntropyLoss()
+        self.loss_fn = nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=Config.LEARNING_RATE, weight_decay=Config.WEIGHT_DECAY)
         # self.optimizer = optim.SGD(model.parameters(), lr=Config.LEARNING_RATE, momentum=Config.MOMENTUM)
         """self.scheduler = torch.optim.lr_scheduler.StepLR(
@@ -27,7 +27,7 @@ class Trainer:
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer = self.optimizer, T_max =  Config.EPOCHS+1, verbose = True)
 
 
-        self.dataset_manager = DataManager()
+        self.dataset_manager = DataManager(Config.MODEL_TYPE)
         self.train_loader = self.dataset_manager.get_training_data()
         self.test_loader = self.dataset_manager.get_training_data()
   

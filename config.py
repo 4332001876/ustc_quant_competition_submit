@@ -12,6 +12,8 @@ class Config:
     # 数据集路径
     DATASET_PATH = '../train.csv'
     TEST_DATASET_PATH = '../test.csv'
+    TEST_DATASET_LABEL_PATH = '../test_label.csv'
+    SAVE_RESULT_PATH = './result.csv'
 
     # 训练参数
     EPOCHS = 12
